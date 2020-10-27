@@ -3,15 +3,26 @@ const { check, validationResult } = require("express-validator");
 
 const db = require("../db/models");
 const { csrfProtection, asyncHandler } = require("./utils.js");
-const { requireAuth } = require('../auth');
+const { requireAuth } = require("../auth");
 
 const router = express.Router();
+
+const checkPermissions = (book, currentUser) => {
+  if (book.userId !== currentUser.id) {
+    const err = new Error("Illegal operation.");
+    err.status = 403; // Forbidden
+    throw err;
+  }
+};
 
 router.get(
   "/",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const books = await db.Book.findAll({ order: [["title", "ASC"]] });
+    const books = await db.Book.findAll({
+      where: { userId: res.locals.user.id },
+      order: [["title", "ASC"]],
+    });
     res.render("book-list", { title: "Books", books });
   })
 );
@@ -62,6 +73,7 @@ router.post(
     const { title, author, releaseDate, pageCount, publisher } = req.body;
 
     const book = db.Book.build({
+      userId: res.locals.user.id,
       title,
       author,
       releaseDate,
@@ -93,6 +105,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const bookId = parseInt(req.params.id, 10);
     const book = await db.Book.findByPk(bookId);
+    checkPermissions(book, res.locals.user);
     res.render("book-edit", {
       title: "Edit Book",
       book,
@@ -109,7 +122,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const bookId = parseInt(req.params.id, 10);
     const bookToUpdate = await db.Book.findByPk(bookId);
-
+    checkPermissions(book, res.locals.user);
     const { title, author, releaseDate, pageCount, publisher } = req.body;
 
     const book = {
@@ -144,6 +157,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const bookId = parseInt(req.params.id, 10);
     const book = await db.Book.findByPk(bookId);
+    checkPermissions(book, res.locals.user);
     res.render("book-delete", {
       title: "Delete Book",
       book,
@@ -159,6 +173,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const bookId = parseInt(req.params.id, 10);
     const book = await db.Book.findByPk(bookId);
+    checkPermissions(book, res.locals.user);
     await book.destroy();
     res.redirect("/");
   })
